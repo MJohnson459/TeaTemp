@@ -1,0 +1,7 @@
+[package]
+name = "TeaTemp"
+version = "0.1.0"
+authors = ["Michael Johnson <mjohnson459@gmail.com>"]
+
+[[bin]]
+name = "TeaTemp"
