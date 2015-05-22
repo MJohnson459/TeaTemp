@@ -1,4 +1,12 @@
 [root]
 name = "TeaTemp"
 version = "0.1.0"
+dependencies = [
+ "gnuplot 0.0.17 (git+https://github.com/SiegeLord/RustGnuplot.git)",
+]
+
+[[package]]
+name = "gnuplot"
+version = "0.0.17"
+source = "git+https://github.com/SiegeLord/RustGnuplot.git#1499d3da1f760494e8eb2ca7d09217a316e37e73"
 

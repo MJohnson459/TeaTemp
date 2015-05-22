@@ -5,3 +5,6 @@ authors = ["Michael Johnson <mjohnson459@gmail.com>"]
 
 [[bin]]
 name = "TeaTemp"
+
+[dependencies.gnuplot]
+git = "https://github.com/SiegeLord/RustGnuplot.git"

@@ -1,4 +1,6 @@
-use std::num;
+extern crate gnuplot;
+
+use gnuplot::*;
 
 const BOLTZMANN: f64 = 0.00000005670373_f64;
 const PI: f64 =  6.28318530717958647692528676655900576_f64;
@@ -58,6 +60,8 @@ fn main() {
     }
 
     println!("1: {}, \t 2: {}", temp1[max_time-1], temp2[max_time-1]);
+
+    plot_temps(max_time as u32, temp1, temp2);
 }
 
 pub struct Mug 
@@ -106,6 +110,23 @@ pub fn power_emitted(area: f64, init_temp: f64, room_temp: f64, emissivity: f64)
 /// power_loss kJ/s == W
 pub fn new_temperature(volume: f64, start_temp: f64, power_loss: f64) -> f64 {
     start_temp - power_loss / (4200.0 * volume)
+}
+
+pub fn plot_temps(max_time: u32, temp1: Vec<f64>, temp2: Vec<f64>) {
+    let mut fg = Figure::new();
+
+    let time = (1u32..max_time).collect::<Vec<u32>>();
+
+	fg.axes2d()
+	.set_size(0.95, 1.0)
+	.set_title("Tea Temperature", &[])
+    .set_x_label("Time (seconds)", &[])
+    .set_y_label("Temperature (Celcius)", &[])
+    .set_y_range(Fix(0.0), Fix(100.0))
+	.lines(time.iter(), temp1.iter(), &[Caption("temp1"), Color("blue")])
+	.lines(time.iter(), temp2.iter(), &[Caption("temp2"), Color("red")]);
+	
+	fg.show();
 }
 
 // Mass of Mug * Cp(mug) * (x-23) = Mass of Water * Cp(wat) * (100-x)
