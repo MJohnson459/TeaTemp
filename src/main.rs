@@ -6,62 +6,41 @@ const BOLTZMANN: f64 = 0.00000005670373_f64;
 const PI: f64 =  6.28318530717958647692528676655900576_f64;
 
 fn main() {
-    println!("Hello, world!");
+   
+    let mug = Mug {height: 0.095, radius: 0.04, weight: 0.282, volume: 364.0};
     
-    
+    //let evap_loss = evaporation_energy(mug.get_top_surface_area(), 0.019826, 0.0147);
 
-    let mug = Mug {height: 0.095, radius: 0.04, weight: 0.282, volume: 0.364*1000.0};
-    /*
-    0	609.9	0.003767
-    5	870	    0.005387
-    10	1225	0.007612
-    15	1701	0.01062
-    20	2333	0.014659
-    25	3130	0.019826
-    30	4234	0.027125 */
-    let evap_loss = evaporation_energy(mug.get_top_surface_area(), 0.019826, 0.0147);
+    //let temp_reduction_needed = (100.0-25.0)*4200.0*mug.get_volume(); // kJ
+    //println!("temp_reduction_needed: {} kJ",  temp_reduction_needed);
 
-    let temp_reduction_needed = (100.0-25.0)*4200.0*mug.get_volume(); // kJ
-    println!("temp_reduction_needed: {} kJ",  temp_reduction_needed);
-
-    println!("Energy from evaporation per second: {} kJ/s",  evap_loss);
-    println!("This will take: {} seconds  ({} mins)",  temp_reduction_needed/evap_loss, (temp_reduction_needed/evap_loss)/60.0);
+    //println!("Energy from evaporation per second: {} kJ/s",  evap_loss);
+    //println!("This will take: {} seconds  ({} mins)",  temp_reduction_needed/evap_loss, (temp_reduction_needed/evap_loss)/60.0);
 
     let init_temp1 = final_temp(&mug, 23.0, 100.0);
     let init_temp2 = final_temp(&mug, init_temp1, 100.0);
 
+    // Add milk
+    // (mass1: f64, temp1: f64, spec_heat1: f64, mass2: f64, temp2: f64, spec_heat2: f64)
+    let init_temp3 = temp_equilibrium(mug.get_volume(), init_temp1, 4200.0,  0.1, 4.0, 4200.0);
+    let init_temp4 = temp_equilibrium(mug.get_volume(), init_temp2, 4200.0,  0.1, 4.0, 4200.0);
+
     println!("volume: {}  init_temp1: {}  init_temp2: {}",  mug.get_volume(), init_temp1, init_temp2);
 
-    let mut temp1 = Vec::new();
-    let mut temp2 = Vec::new();
-
-    temp1.push(init_temp1);
-    temp2.push(init_temp2);
-
-    let max_time = 3600; // s
+    let max_time = 3600u32; // s
     let room_temp = 25.0;
-    let total_radiative_area = mug.get_side_surface_area() + mug.get_top_surface_area();
-    println!("Area: {}m^2  Temp: {}K", total_radiative_area, init_temp1);
-    println!("Area: {}m^2  Temp: {}K", total_radiative_area, init_temp2);
 
-    let temp_reduction_needed = (init_temp1-room_temp)*4200.0*mug.get_volume()/1000.0; // kJ
-    println!("temp_reduction_needed: {} kJ",  temp_reduction_needed);
-
+    let mut experiments = Vec::new();
+    experiments.push(Experiment::new(init_temp1, room_temp, vec!(Caption("Normal Cup"), Color("red"))));
+    experiments.push(Experiment::new(init_temp2, room_temp, vec!(Caption("Heated Cup"), Color("blue"))));
+    experiments.push(Experiment::new(init_temp3, room_temp, vec!(Caption("Normal Cup w/ Milk"), Color("green"))));
+    experiments.push(Experiment::new(init_temp4, room_temp, vec!(Caption("Heated Cup w/ Milk"), Color("purple"))));
     
-
-    for time in 1..max_time {
-        let prev_temp1 = temp1[time-1];
-        let power1 = power_emitted(total_radiative_area, prev_temp1, room_temp, 1.0);
-        temp1.push(new_temperature(mug.get_volume(), prev_temp1, power1));
-
-        let prev_temp2 = temp2[time-1];
-        let power2 = power_emitted(total_radiative_area, prev_temp2, room_temp, 1.0);
-        temp2.push(new_temperature(mug.get_volume(), prev_temp2, power2));
+    for experiment in &mut experiments {
+        experiment.simulate(max_time, &mug);
     }
 
-    println!("1: {}, \t 2: {}", temp1[max_time-1], temp2[max_time-1]);
-
-    plot_temps(max_time as u32, temp1, temp2);
+    plot_temps(max_time, &experiments);
 }
 
 pub struct Mug 
@@ -90,9 +69,52 @@ impl Mug {
 
 }
 
+pub struct  Experiment<'l> {
+    init_temp: f64,
+    room_temp: f64,
+    result: Vec<f64>,
+    plot_options: Vec<PlotOption<'l>>,
+}
+
+impl<'l> Experiment<'l> {
+    pub fn new(init_temp: f64, room_temp: f64, plot_options: Vec<PlotOption<'l>>) -> Experiment {
+        Experiment {
+            init_temp: init_temp,
+            room_temp: room_temp,
+            result: Vec::new(),
+            plot_options: plot_options,
+        }
+    }
+
+    pub fn simulate(&mut self, max_time: u32, mug: &Mug) {
+        self.result = simulate(max_time, self.init_temp, self.room_temp, &mug);
+    }
+}
+
 pub fn final_temp(mug: &Mug, mug_temp: f64, water_temp: f64) -> f64 {
     let water_weight = mug.get_volume(); // kg
-    ((water_weight * 4200.0) * water_temp + (mug.weight * 1085.0) * mug_temp) / ((water_weight * 4200.0) + (mug.weight * 1085.0))
+    temp_equilibrium(water_weight, water_temp, 4200.0, mug.weight, mug_temp, 1085.0)
+}
+
+pub fn temp_equilibrium(mass1: f64, temp1: f64, spec_heat1: f64, mass2: f64, temp2: f64, spec_heat2: f64) -> f64 {
+    ((mass1 * spec_heat1) * temp1 + (mass2 * spec_heat2) * temp2) / ((mass1 * spec_heat1) + (mass2 * spec_heat2))
+}
+
+pub fn simulate(sim_time: u32, init_temp: f64, room_temp: f64, mug: &Mug) -> Vec<f64> {
+    let mut result = Vec::new();
+
+    result.push(init_temp);
+
+    let total_radiative_area = mug.get_side_surface_area() + mug.get_top_surface_area();
+    println!("Area: {}m^2  Temp: {}K", total_radiative_area, init_temp);
+
+    for time in 1..sim_time as usize {
+        let prev_temp = result[time-1];
+        let power = power_emitted(total_radiative_area, prev_temp, room_temp, 1.0);
+        result.push(new_temperature(mug.get_volume(), prev_temp, power));
+    }
+
+    result
 }
 
 /**
@@ -112,19 +134,26 @@ pub fn new_temperature(volume: f64, start_temp: f64, power_loss: f64) -> f64 {
     start_temp - power_loss / (4200.0 * volume)
 }
 
-pub fn plot_temps(max_time: u32, temp1: Vec<f64>, temp2: Vec<f64>) {
+pub fn plot_temps(max_time: u32, experiments: &Vec<Experiment>) {
     let mut fg = Figure::new();
 
     let time = (1u32..max_time).collect::<Vec<u32>>();
 
-	fg.axes2d()
-	.set_size(0.95, 1.0)
-	.set_title("Tea Temperature", &[])
-    .set_x_label("Time (seconds)", &[])
-    .set_y_label("Temperature (Celcius)", &[])
-    .set_y_range(Fix(0.0), Fix(100.0))
-	.lines(time.iter(), temp1.iter(), &[Caption("temp1"), Color("blue")])
-	.lines(time.iter(), temp2.iter(), &[Caption("temp2"), Color("red")]);
+    {
+        let mut graph = fg.axes2d();
+        graph
+        .set_size(0.95, 1.0)
+        .set_title("Tea Temperature", &[])
+        .set_x_label("Time (seconds)", &[])
+        .set_y_label("Temperature (Celcius)", &[])
+        .set_y_range(Fix(30.0), Fix(100.0));
+
+        let mut index = 1;
+        for experiment in experiments {
+            graph.lines(time.iter(), experiment.result.iter(), &experiment.plot_options);
+            index = index + 1;
+        }
+    }
 	
 	fg.show();
 }
